@@ -28,6 +28,17 @@
     display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px;letter-spacing:.02em;}
   .appbar .t{font-size:18px;font-weight:700;color:var(--primary-d);}
   .appbar .s{font-size:14px;color:var(--muted);margin-top:2px;}
+  .appbar .spacer{flex:1;}
+  .appbar-actions{display:flex; gap:8px;}
+  .tbtn{appearance:none;font-family:inherit;font-size:15px;font-weight:700;border-radius:10px;
+        padding:10px 15px;border:1.5px solid var(--line);background:#fff;color:var(--primary-d);
+        cursor:pointer;white-space:nowrap;line-height:1;transition:border-color .15s,background .15s;}
+  .tbtn:hover{border-color:var(--accent);}
+  .tbtn:focus-visible{outline:3px solid var(--focus);outline-offset:2px;}
+  .tbtn.solid{background:var(--primary);color:#fff;border-color:var(--primary);}
+  .tbtn.solid:hover{filter:brightness(1.07);border-color:var(--primary);}
+  .tbtn .ic{margin-right:6px;font-weight:700;}
+  @media (max-width:560px){ .tbtn{font-size:13px;padding:9px 11px;} .appbar .s{font-size:12px;} }
   /* ===== プログレス ===== */
   .progress{margin:0 4px 20px;}
   .progress .meta{display:flex;justify-content:space-between;align-items:baseline;font-size:15px;color:var(--muted);margin-bottom:8px;}
@@ -135,6 +146,11 @@
     <div>
       <div class="t">膝関節評価スコア（KOOS）</div>
       <div class="s">加納岩総合病院　再生医療（PRP）フォローアップ評価</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="appbar-actions">
+      <button type="button" class="tbtn" id="btnReload"><span class="ic">↻</span>更新</button>
+      <button type="button" class="tbtn solid" id="btnNew"><span class="ic">＋</span>新規患者</button>
     </div>
   </div>
 
@@ -533,6 +549,22 @@ function resetAll(){
   QUESTIONS.forEach(q=> state.answers[q.code]=null);
   render();
 }
+
+/* --- ヘッダーのボタン（どの画面でも使用可） --- */
+function inProgress(){
+  return state.step!=='start' && state.step!=='done';
+}
+function reloadPage(){
+  if(inProgress() && !confirm('ページを更新すると入力中の内容は消えます。更新してもよろしいですか？')) return;
+  location.reload();
+}
+function newPatient(){
+  if(inProgress() && !confirm('入力中の内容は保存されません。新しい患者の入力を最初から始めますか？')) return;
+  resetAll();
+  window.scrollTo(0,0);
+}
+document.getElementById('btnReload').addEventListener('click', reloadPage);
+document.getElementById('btnNew').addEventListener('click', newPatient);
 
 render();
 </script>
