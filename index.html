@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0E4A43">
+<title>膝関節評価スコア（KOOS）｜加納岩総合病院</title>
+<style>
+  :root{
+    --bg:#EAF0F0; --paper:#FFFFFF; --ink:#16302C; --muted:#5C6B68;
+    --line:#D6DEDD; --primary:#14655C; --primary-d:#0E4A43; --accent:#2E9C88;
+    --accent-soft:#E4F1ED; --amber:#B07A1E; --amber-soft:#FBF1DD;
+    --danger:#B23B3B; --focus:#2E9C88; --sel:#0E4A43;
+    --radius:18px; --shadow:0 6px 22px rgba(14,74,67,.10);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic Medium","Yu Gothic","Noto Sans JP","Meiryo",system-ui,sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.7;
+    font-size:20px; -webkit-font-smoothing:antialiased;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .wrap{max-width:920px; margin:0 auto; padding:20px 20px 48px; min-height:100vh; display:flex; flex-direction:column;}
+  /* ===== ヘッダー ===== */
+  .appbar{display:flex; align-items:center; gap:14px; padding:8px 4px 18px;}
+  .appbar .mark{width:44px;height:44px;border-radius:12px;background:var(--primary);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px;letter-spacing:.02em;}
+  .appbar .t{font-size:18px;font-weight:700;color:var(--primary-d);}
+  .appbar .s{font-size:14px;color:var(--muted);margin-top:2px;}
+  /* ===== プログレス ===== */
+  .progress{margin:0 4px 20px;}
+  .progress .meta{display:flex;justify-content:space-between;align-items:baseline;font-size:15px;color:var(--muted);margin-bottom:8px;}
+  .progress .meta b{color:var(--primary-d);font-size:16px;}
+  .bar{height:12px;background:#DCE6E4;border-radius:99px;overflow:hidden;}
+  .bar>span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--primary));border-radius:99px;transition:width .35s ease;}
+  /* ===== カード ===== */
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:32px 30px;flex:1 0 auto;display:flex;flex-direction:column;}
+  h1{font-size:30px;line-height:1.5;margin:0 0 8px;color:var(--primary-d);font-weight:800;letter-spacing:.01em;}
+  h2{font-size:22px;margin:0 0 4px;color:var(--primary-d);font-weight:700;}
+  .lead{font-size:19px;color:var(--muted);margin:0 0 26px;}
+  .eyebrow{display:inline-block;font-size:15px;font-weight:700;color:var(--accent);
+    background:var(--accent-soft);padding:6px 14px;border-radius:99px;margin-bottom:16px;letter-spacing:.03em;}
+  /* ===== 質問 ===== */
+  .qtext{font-size:32px;line-height:1.55;font-weight:800;color:var(--ink);margin:6px 0 28px;letter-spacing:.01em;}
+  @media(max-width:520px){.qtext{font-size:27px;} h1{font-size:26px;} body{font-size:19px;}}
+  .opts{display:flex;flex-direction:column;gap:14px;margin-top:auto;}
+  .opt{display:flex;align-items:center;gap:16px;width:100%;text-align:left;cursor:pointer;
+    background:#fff;border:2.5px solid var(--line);border-radius:16px;padding:20px 22px;font-size:23px;font-weight:600;
+    color:var(--ink);transition:border-color .15s,background .15s,transform .05s;font-family:inherit;}
+  .opt .num{flex:0 0 auto;width:38px;height:38px;border-radius:50%;border:2.5px solid var(--line);
+    display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--muted);background:#fff;}
+  .opt:hover{border-color:var(--accent);}
+  .opt:active{transform:scale(.99);}
+  .opt.sel{border-color:var(--sel);background:var(--accent-soft);}
+  .opt.sel .num{background:var(--primary);border-color:var(--primary);color:#fff;}
+  .opt:focus-visible{outline:4px solid var(--focus);outline-offset:2px;}
+  /* ===== ボタン ===== */
+  .btnrow{display:flex;gap:14px;margin-top:26px;align-items:center;flex-wrap:wrap;}
+  .btn{appearance:none;font-family:inherit;font-size:21px;font-weight:700;border-radius:14px;padding:18px 30px;
+    border:2.5px solid transparent;cursor:pointer;transition:filter .15s,background .15s,border-color .15s;line-height:1.2;}
+  .btn:focus-visible{outline:4px solid var(--focus);outline-offset:2px;}
+  .btn.primary{background:var(--primary);color:#fff;}
+  .btn.primary:hover{filter:brightness(1.07);}
+  .btn.primary:disabled{background:#AEBFBB;cursor:not-allowed;filter:none;}
+  .btn.ghost{background:#fff;color:var(--primary-d);border-color:var(--line);}
+  .btn.ghost:hover{border-color:var(--accent);}
+  .btn.skip{background:transparent;color:var(--amber);border-color:transparent;padding:14px 12px;font-size:18px;font-weight:700;text-decoration:underline;text-underline-offset:4px;}
+  .btn.wide{width:100%;justify-content:center;text-align:center;display:flex;}
+  .btn.lg{font-size:23px;padding:22px 34px;}
+  .spacer{flex:1;}
+  /* ===== 入力 ===== */
+  .field{margin-bottom:24px;}
+  .field label{display:block;font-size:18px;font-weight:700;color:var(--primary-d);margin-bottom:10px;}
+  .field .hint{font-weight:500;color:var(--muted);font-size:15px;}
+  .req{color:var(--danger);font-size:15px;margin-left:6px;}
+  input[type=text],input[type=number]{width:100%;font-family:inherit;font-size:26px;padding:18px 20px;border:2.5px solid var(--line);
+    border-radius:14px;background:#fff;color:var(--ink);}
+  input:focus{outline:none;border-color:var(--accent);}
+  .chips{display:flex;flex-wrap:wrap;gap:12px;}
+  .chip{font-family:inherit;font-size:21px;font-weight:700;padding:16px 26px;border-radius:14px;border:2.5px solid var(--line);
+    background:#fff;color:var(--ink);cursor:pointer;transition:.15s;}
+  .chip:hover{border-color:var(--accent);}
+  .chip.sel{background:var(--accent-soft);border-color:var(--sel);color:var(--primary-d);}
+  .chip:focus-visible{outline:4px solid var(--focus);outline-offset:2px;}
+  /* ===== 同意 ===== */
+  .consent-box{background:#F6F9F8;border:1px solid var(--line);border-radius:14px;padding:22px 24px;font-size:17px;color:var(--ink);margin-bottom:22px;}
+  .consent-box ul{margin:12px 0 0;padding-left:22px;}
+  .consent-box li{margin-bottom:8px;}
+  .consent-box a{color:var(--primary);font-weight:700;}
+  .checkline{display:flex;align-items:flex-start;gap:16px;background:#fff;border:2.5px solid var(--line);border-radius:14px;padding:20px 22px;cursor:pointer;}
+  .checkline.on{border-color:var(--sel);background:var(--accent-soft);}
+  .checkline .box{flex:0 0 auto;width:34px;height:34px;border-radius:9px;border:2.5px solid var(--muted);background:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;margin-top:2px;}
+  .checkline.on .box{background:var(--primary);border-color:var(--primary);}
+  .checkline .txt{font-size:20px;font-weight:700;color:var(--ink);}
+  /* ===== VAS ===== */
+  .vasgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin:14px 0 6px;}
+  @media(max-width:520px){.vasgrid{grid-template-columns:repeat(4,1fr);}}
+  .vasbtn{aspect-ratio:1/1;border-radius:14px;border:2.5px solid var(--line);background:#fff;font-family:inherit;
+    font-size:28px;font-weight:800;color:var(--ink);cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;}
+  .vasbtn:hover{border-color:var(--accent);}
+  .vasbtn.sel{background:var(--primary);border-color:var(--primary);color:#fff;}
+  .vasends{display:flex;justify-content:space-between;font-size:15px;color:var(--muted);margin-top:6px;padding:0 4px;}
+  /* ===== レビュー ===== */
+  .revitem{display:flex;align-items:center;gap:16px;justify-content:space-between;background:#fff;border:2px solid var(--amber);
+    border-left-width:8px;border-radius:12px;padding:16px 20px;margin-bottom:12px;}
+  .revitem .q{font-size:18px;font-weight:700;}
+  .revitem .tag{font-size:14px;color:var(--amber);font-weight:700;}
+  /* ===== 確認 ===== */
+  .scoregrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:8px 0 20px;}
+  .scorecell{background:#F6F9F8;border:1px solid var(--line);border-radius:14px;padding:18px 16px;text-align:center;}
+  .scorecell .lab{font-size:15px;color:var(--muted);font-weight:700;}
+  .scorecell .val{font-size:34px;font-weight:800;color:var(--primary-d);margin-top:4px;line-height:1.1;}
+  .scorecell .unit{font-size:14px;color:var(--muted);}
+  .kv{display:flex;flex-wrap:wrap;gap:8px 26px;background:#F6F9F8;border:1px solid var(--line);border-radius:14px;padding:18px 22px;margin-bottom:22px;font-size:17px;}
+  .kv div{min-width:130px;}
+  .kv b{color:var(--primary-d);}
+  /* ===== 完了・エラー ===== */
+  .center{text-align:center;align-items:center;justify-content:center;}
+  .bigicon{width:96px;height:96px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;
+    font-size:52px;margin:0 auto 20px;color:var(--primary);}
+  .bigicon.err{background:#FBEAEA;color:var(--danger);}
+  .note{font-size:15px;color:var(--muted);margin-top:18px;}
+  .foot{text-align:center;font-size:13px;color:var(--muted);padding-top:22px;}
+  .hidden{display:none !important;}
+  @media (prefers-reduced-motion: reduce){*{transition:none !important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="appbar">
+    <div class="mark">膝</div>
+    <div>
+      <div class="t">膝関節評価スコア（KOOS）</div>
+      <div class="s">加納岩総合病院　再生医療（PRP）フォローアップ評価</div>
+    </div>
+  </div>
+
+  <div id="progress" class="progress hidden">
+    <div class="meta"><span id="pgLabel">症状</span><span><b id="pgNow">1</b> / <span id="pgTotal">43</span> 問</span></div>
+    <div class="bar"><span id="pgFill" style="width:0%"></span></div>
+  </div>
+
+  <div id="screen" class="card"></div>
+
+  <div class="foot">この画面には氏名などの個人情報は入力しません。患者番号のみで管理します。</div>
+</div>
+
+<script>
+/* ====== 設定：GASのウェブアプリURLをここに貼り付け ====== */
+const CONFIG = {
+  GAS_URL: "https://script.google.com/macros/s/AKfycbw14UAP-o6LecgOgK3k8KLiuhREpqzRVQTF8BYuZo7WGcVg7-mecx0rDdJMiGNEYYqj/exec",  // GASデプロイ済みURL
+  PRIVACY_URL: "https://kanoiwa-hospital.or.jp/%e7%97%85%e9%99%a2%e3%81%ab%e3%81%a4%e3%81%84%e3%81%a6/%e5%80%8b%e4%ba%ba%e6%83%85%e5%a0%b1%e4%bf%9d%e8%ad%b7%e6%96%b9%e9%87%9d",
+  APP_VERSION: "KOOS-Web v1.0"
+};
+
+const SECTIONS = {"Sym": {"jp": "症状", "weights": [14.3, 10.7, 7.1, 3.6, 0.0]}, "Pain": {"jp": "痛み", "weights": [11.1, 8.3, 5.6, 2.8, 0.0]}, "ADL": {"jp": "日常生活", "weights": [5.9, 4.4, 2.9, 1.5, 0.0]}, "Sp/Rec": {"jp": "スポーツ・レクリエーション", "weights": [20, 15, 10, 5, 0]}, "QOL": {"jp": "生活の質（QOL）", "weights": [25, 18.8, 12.5, 6.3, 0.0]}};
+const QUESTIONS = [{"code": "S1", "sec": "Sym", "group": "症状", "text": "膝に腫れがありますか", "opts": ["まったくない", "まれにある", "ときどきある", "ひんぱんにある", "いつもある"]}, {"code": "S2", "sec": "Sym", "group": "症状", "text": "膝を動かしたときに、きしみを感じたり、引っかかる音が聞こえたり、その他の雑音が聞こえたりしますか", "opts": ["まったくない", "まれにある", "ときどきある", "ひんぱんにある", "いつもある"]}, {"code": "S3", "sec": "Sym", "group": "症状", "text": "動いている最中に、膝がひっかかったり、動かなくなったりしますか", "opts": ["まったくない", "まれにある", "ときどきある", "ひんぱんにある", "いつもある"]}, {"code": "S4", "sec": "Sym", "group": "症状", "text": "膝を完全に伸ばすことができますか", "opts": ["いつもできる", "たいていできる", "ときどきできる", "ほとんどできない", "まったくできない"]}, {"code": "S5", "sec": "Sym", "group": "症状", "text": "膝を完全に曲げることができますか", "opts": ["いつもできる", "たいていできる", "ときどきできる", "ほとんどできない", "まったくできない"]}, {"code": "S6", "sec": "Sym", "group": "こわばり", "text": "朝起きたときに、どの程度の膝のこわばりがありますか", "opts": ["まったくない", "すこしある", "あるていどある", "かなりある", "ひどい"]}, {"code": "S7", "sec": "Sym", "group": "こわばり", "text": "午後や夕方に、座ったり・横になったり・休んだ後、どの程度の膝のこわばりがありますか", "opts": ["まったくない", "すこしある", "あるていどある", "かなりある", "ひどい"]}, {"code": "P1", "sec": "Pain", "group": "痛み", "text": "膝の痛みの頻度はどのくらいですか", "opts": ["まったくない", "月に１，２回", "週に１，２回", "日に１，２回", "いつも"]}, {"code": "P2", "sec": "Pain", "group": "痛み", "text": "膝をひねったり回したりするとき", "opts": ["まったくいたくない", "すこしいたい", "あるていどいたい", "すごくいたい", "ものすごくいたい"]}, {"code": "P3", "sec": "Pain", "group": "痛み", "text": "膝を完全に伸ばすとき", "opts": ["まったくいたくない", "すこしいたい", "あるていどいたい", "すごくいたい", "ものすごくいたい"]}, {"code": "P4", "sec": "Pain", "group": "痛み", "text": "膝を完全に曲げるとき", "opts": ["まったくいたくない", "すこしいたい", "あるていどいたい", "すごくいたい", "ものすごくいたい"]}, {"code": "P5", "sec": "Pain", "group": "痛み", "text": "平らな場所を歩くとき", "opts": ["まったくいたくない", "すこしいたい", "あるていどいたい", "すごくいたい", "ものすごくいたい"]}, {"code": "P6", "sec": "Pain", "group": "痛み", "text": "階段を上り下りするとき", "opts": ["まったくいたくない", "すこしいたい", "あるていどいたい", "すごくいたい", "ものすごくいたい"]}, {"code": "P7", "sec": "Pain", "group": "痛み", "text": "夜、寝ているとき", "opts": ["まったくいたくない", "すこしいたい", "あるていどいたい", "すごくいたい", "ものすごくいたい"]}, {"code": "P8", "sec": "Pain", "group": "痛み", "text": "座っているときや、横になっているとき", "opts": ["まったくいたくない", "すこしいたい", "あるていどいたい", "すごくいたい", "ものすごくいたい"]}, {"code": "P9", "sec": "Pain", "group": "痛み", "text": "まっすぐ立っているとき", "opts": ["まったくいたくない", "すこしいたい", "あるていどいたい", "すごくいたい", "ものすごくいたい"]}, {"code": "A1", "sec": "ADL", "group": "日常生活", "text": "階段を下りるとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "A2", "sec": "ADL", "group": "日常生活", "text": "階段を上るとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "A3", "sec": "ADL", "group": "日常生活", "text": "座った状態から立ち上がるとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "A4", "sec": "ADL", "group": "日常生活", "text": "立っているとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "A5", "sec": "ADL", "group": "日常生活", "text": "身をかがめて、床に落ちた物を拾うとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "A6", "sec": "ADL", "group": "日常生活", "text": "平らな場所を歩くとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "A7", "sec": "ADL", "group": "日常生活", "text": "車の乗り降りをするとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "A8", "sec": "ADL", "group": "日常生活", "text": "買い物に行くとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "A9", "sec": "ADL", "group": "日常生活", "text": "靴下やストッキングをはくとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "A10", "sec": "ADL", "group": "日常生活", "text": "ベッドから起き上がるとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "A11", "sec": "ADL", "group": "日常生活", "text": "靴下やストッキングを脱ぐとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "A12", "sec": "ADL", "group": "日常生活", "text": "ベッドに横たわっているとき（寝返りをうつなど）", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "A13", "sec": "ADL", "group": "日常生活", "text": "浴槽に入る／浴槽から出るとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "A14", "sec": "ADL", "group": "日常生活", "text": "椅子に座っているとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "A15", "sec": "ADL", "group": "日常生活", "text": "洋式トイレを使うとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "A16", "sec": "ADL", "group": "日常生活", "text": "大変な家事を行うとき（重い箱を動かす、床を拭くなど）", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "A17", "sec": "ADL", "group": "日常生活", "text": "簡単な家事を行うとき（料理、ちりやほこりを払うなど）", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "SP1", "sec": "Sp/Rec", "group": "スポーツ・レクリエーション活動", "text": "しゃがむとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "SP2", "sec": "Sp/Rec", "group": "スポーツ・レクリエーション活動", "text": "走るとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "SP3", "sec": "Sp/Rec", "group": "スポーツ・レクリエーション活動", "text": "ジャンプするとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "SP4", "sec": "Sp/Rec", "group": "スポーツ・レクリエーション活動", "text": "悪い方の膝をひねったり、回したりするとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "SP5", "sec": "Sp/Rec", "group": "スポーツ・レクリエーション活動", "text": "ひざまずくとき", "opts": ["全く不自由を感じない", "すこし困難である", "ある程度困難である", "とても困難である", "ほとんどできない"]}, {"code": "Q1", "sec": "QOL", "group": "生活の質（QOL）", "text": "どのくらいの頻度で、自分の膝の問題を自覚しますか", "opts": ["まったくない", "月に１，２回", "週に１，２回", "日に１，２回", "いつも"]}, {"code": "Q2", "sec": "QOL", "group": "生活の質（QOL）", "text": "膝に良くない行動をさけるために、生活様式を変えましたか", "opts": ["まったく変えていない", "すこし変えた", "ある程度変えた", "かなり変えた", "完全に変えた"]}, {"code": "Q3", "sec": "QOL", "group": "生活の質（QOL）", "text": "膝に自信を持てないことで、どの程度困っていますか", "opts": ["まったく困っていない", "すこし困っている", "ある程度困っている", "かなり困っている", "非常にこまっている"]}, {"code": "Q4", "sec": "QOL", "group": "生活の質（QOL）", "text": "全体的に、どのくらい膝について困難を感じますか", "opts": ["まったくない", "すこし困難である", "ある程度困難である", "かなり困難である", "非常に困難である"]}];
+const TOTAL = QUESTIONS.length;      // 42
+const VAS_INDEX = TOTAL;             // VASは最後(=42)
+
+/* ====== 状態 ====== */
+const state = {
+  step: "start",
+  patientId: "",
+  timepoint: "", site: "", age: "", sex: "",
+  consent: false,
+  answers: {},   // code -> 1..5
+  vas: null,     // 0..10
+  idx: 0,        // 質問インデックス 0..TOTAL(=VAS)
+  reviewMode: false
+};
+QUESTIONS.forEach(q => state.answers[q.code] = null);
+
+const el = document.getElementById('screen');
+const $ = (h) => { const d=document.createElement('div'); d.innerHTML=h; return d.firstElementChild; };
+const esc = (s)=> (s+'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ====== プログレス表示 ====== */
+function updateProgress(){
+  const pg = document.getElementById('progress');
+  if(state.step!=='quiz' && state.step!=='vas'){ pg.classList.add('hidden'); return; }
+  pg.classList.remove('hidden');
+  const now = state.idx+1;
+  document.getElementById('pgNow').textContent = now;
+  document.getElementById('pgTotal').textContent = TOTAL+1;
+  document.getElementById('pgFill').style.width = (now/(TOTAL+1)*100)+'%';
+  document.getElementById('pgLabel').textContent =
+    state.idx===VAS_INDEX ? '痛みの程度（VAS）' : QUESTIONS[state.idx].group;
+}
+
+/* ====== スコア計算（xlsxと同一ロジック：選択の重みを合計） ====== */
+function calcScores(){
+  const sums = {Pain:0,Sym:0,ADL:0,"Sp/Rec":0,QOL:0};
+  QUESTIONS.forEach(q=>{
+    const sel = state.answers[q.code];
+    if(sel){ sums[q.sec] += SECTIONS[q.sec].weights[sel-1]; }
+  });
+  const r = {};
+  Object.keys(sums).forEach(k=> r[k]=Math.round(sums[k]*10)/10);
+  return r;
+}
+function firstUnanswered(){
+  for(let i=0;i<TOTAL;i++){ if(state.answers[QUESTIONS[i].code]==null) return i; }
+  if(state.vas==null) return VAS_INDEX;
+  return -1;
+}
+
+/* ====== 画面描画 ====== */
+function render(){
+  updateProgress();
+  const map = {start:scrStart, consent:scrConsent, info:scrInfo, quiz:scrQuiz,
+               vas:scrVas, review:scrReview, confirm:scrConfirm, sending:scrSending,
+               done:scrDone, error:scrError};
+  (map[state.step]||scrStart)();
+  window.scrollTo(0,0);
+}
+
+/* --- スタート（患者番号） --- */
+function scrStart(){
+  el.className='card';
+  el.innerHTML = `
+    <span class="eyebrow">ステップ 1／3</span>
+    <h1>患者番号を入力してください</h1>
+    <p class="lead">この評価では、お名前などの個人情報は入力しません。<br>受付でお渡しした<b>患者番号</b>のみを入力してください。</p>
+    <div class="field">
+      <label for="pid">患者番号<span class="req">必須</span></label>
+      <input id="pid" type="text" inputmode="numeric" autocomplete="off" placeholder="例：21587" value="${esc(state.patientId)}">
+    </div>
+    <div class="btnrow">
+      <div class="spacer"></div>
+      <button class="btn primary lg" id="next">次へすすむ ▶</button>
+    </div>`;
+  const inp = el.querySelector('#pid');
+  const go = ()=>{ const v=inp.value.trim(); if(!v){ inp.focus(); inp.style.borderColor='var(--danger)'; return;} state.patientId=v; state.step='consent'; render(); };
+  el.querySelector('#next').onclick=go;
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter') go(); });
+  setTimeout(()=>inp.focus(),100);
+}
+
+/* --- 同意 --- */
+function scrConsent(){
+  el.className='card';
+  el.innerHTML = `
+    <span class="eyebrow">ステップ 2／3</span>
+    <h1>ご利用にあたっての同意</h1>
+    <div class="consent-box">
+      このアンケートは、膝の治療（再生医療・PRP）の効果を確認するために行います。ご回答内容は次の目的で利用します。
+      <ul>
+        <li>治療前・治療後の膝の状態を評価し、経過を確認するため</li>
+        <li>法令にもとづく再生医療の定期報告のため（統計として集計します）</li>
+      </ul>
+      回答は<b>患者番号のみ</b>で管理し、氏名などの個人情報とは切り離して取り扱います。
+      個人情報の取り扱いについては
+      <a href="${CONFIG.PRIVACY_URL}" target="_blank" rel="noopener">当院の個人情報保護方針</a>
+      をご確認ください。
+    </div>
+    <div class="checkline ${state.consent?'on':''}" id="chk" role="checkbox" tabindex="0" aria-checked="${state.consent}">
+      <div class="box">${state.consent?'✓':''}</div>
+      <div class="txt">上記の内容を確認し、回答することに同意します</div>
+    </div>
+    <div class="btnrow">
+      <button class="btn ghost" id="back">◀ もどる</button>
+      <div class="spacer"></div>
+      <button class="btn primary lg" id="next" ${state.consent?'':'disabled'}>同意して次へ ▶</button>
+    </div>`;
+  const chk=el.querySelector('#chk'), next=el.querySelector('#next');
+  const toggle=()=>{ state.consent=!state.consent; chk.classList.toggle('on',state.consent);
+    chk.querySelector('.box').textContent=state.consent?'✓':''; chk.setAttribute('aria-checked',state.consent);
+    next.disabled=!state.consent; };
+  chk.onclick=toggle;
+  chk.addEventListener('keydown',e=>{ if(e.key===' '||e.key==='Enter'){e.preventDefault();toggle();} });
+  el.querySelector('#back').onclick=()=>{ state.step='start'; render(); };
+  next.onclick=()=>{ if(state.consent){ state.step='info'; render(); } };
+}
+
+/* --- 基本情報 --- */
+function scrInfo(){
+  el.className='card';
+  const chipset=(name,opts)=> opts.map(o=>`<button class="chip ${state[name]===o?'sel':''}" data-name="${name}" data-val="${esc(o)}">${esc(o)}</button>`).join('');
+  el.innerHTML = `
+    <span class="eyebrow">ステップ 3／3</span>
+    <h1>評価の情報を選んでください</h1>
+    <div class="field">
+      <label>評価の時期<span class="req">必須</span> <span class="hint">（今回はいつの評価ですか）</span></label>
+      <div class="chips">${chipset('timepoint',['術前','1ヶ月','3ヶ月','6ヶ月'])}</div>
+    </div>
+    <div class="field">
+      <label>投与部位<span class="req">必須</span></label>
+      <div class="chips">${chipset('site',['右膝','左膝','両膝'])}</div>
+    </div>
+    <div class="field">
+      <label>性別 <span class="hint">（報告書に使用します）</span></label>
+      <div class="chips">${chipset('sex',['男','女','その他','未回答'])}</div>
+    </div>
+    <div class="field">
+      <label for="age">年齢 <span class="hint">（半角数字・任意）</span></label>
+      <input id="age" type="number" inputmode="numeric" min="0" max="120" placeholder="例：75" value="${esc(state.age)}">
+    </div>
+    <div class="btnrow">
+      <button class="btn ghost" id="back">◀ もどる</button>
+      <div class="spacer"></div>
+      <button class="btn primary lg" id="next">質問へすすむ ▶</button>
+    </div>`;
+  el.querySelectorAll('.chip').forEach(c=> c.onclick=()=>{
+    const n=c.dataset.name; state[n]=c.dataset.val;
+    el.querySelectorAll(`.chip[data-name="${n}"]`).forEach(x=>x.classList.remove('sel'));
+    c.classList.add('sel');
+  });
+  el.querySelector('#age').oninput=e=> state.age=e.target.value.trim();
+  el.querySelector('#back').onclick=()=>{ state.step='consent'; render(); };
+  el.querySelector('#next').onclick=()=>{
+    if(!state.timepoint||!state.site){ alert('「評価の時期」と「投与部位」を選んでください。'); return; }
+    state.idx=0; state.reviewMode=false; state.step='quiz'; render();
+  };
+}
+
+/* --- 質問（1問ずつ・自動で次へ） --- */
+function scrQuiz(){
+  if(state.idx>=TOTAL){ state.step='vas'; render(); return; }
+  const q=QUESTIONS[state.idx];
+  const sel=state.answers[q.code];
+  el.className='card';
+  el.innerHTML = `
+    <div class="eyebrow">${esc(q.group)}</div>
+    <div class="qtext">${esc(q.text)}</div>
+    <div class="opts">
+      ${q.opts.map((o,i)=>`
+        <button class="opt ${sel===i+1?'sel':''}" data-v="${i+1}">
+          <span class="num">${i+1}</span><span>${esc(o)}</span>
+        </button>`).join('')}
+    </div>
+    <div class="btnrow">
+      <button class="btn ghost" id="back">◀ もどる</button>
+      <div class="spacer"></div>
+      <button class="btn skip" id="skip">この質問をとばす ▶</button>
+    </div>`;
+  el.querySelectorAll('.opt').forEach(b=> b.onclick=()=>{
+    state.answers[q.code]=parseInt(b.dataset.v,10);
+    el.querySelectorAll('.opt').forEach(x=>x.classList.remove('sel'));
+    b.classList.add('sel');
+    setTimeout(advance,260);
+  });
+  el.querySelector('#skip').onclick=advance;
+  el.querySelector('#back').onclick=()=>{
+    if(state.reviewMode){ state.step='review'; render(); return; }
+    if(state.idx>0){ state.idx--; render(); } else { state.step='info'; render(); }
+  };
+}
+function advance(){
+  if(state.reviewMode){ state.step='review'; render(); return; }
+  state.idx++;
+  if(state.idx>=TOTAL){ state.step='vas'; } 
+  render();
+}
+
+/* --- VAS --- */
+function scrVas(){
+  state.idx=VAS_INDEX;
+  el.className='card';
+  el.innerHTML = `
+    <div class="eyebrow">痛みの程度（VAS）</div>
+    <div class="qtext">今の膝の痛みは、どのくらいですか？<br><span style="font-size:20px;font-weight:600;color:var(--muted)">0（痛みなし）〜 10（考えられる最もひどい痛み）で選んでください。</span></div>
+    <div class="vasgrid">
+      ${Array.from({length:11},(_,n)=>`<button class="vasbtn ${state.vas===n?'sel':''}" data-v="${n}">${n}</button>`).join('')}
+    </div>
+    <div class="vasends"><span>0：痛みなし</span><span>10：最もひどい痛み</span></div>
+    <div class="btnrow">
+      <button class="btn ghost" id="back">◀ もどる</button>
+      <div class="spacer"></div>
+      <button class="btn skip" id="skip">とばす ▶</button>
+    </div>`;
+  el.querySelectorAll('.vasbtn').forEach(b=> b.onclick=()=>{
+    state.vas=parseInt(b.dataset.v,10);
+    el.querySelectorAll('.vasbtn').forEach(x=>x.classList.remove('sel'));
+    b.classList.add('sel');
+    setTimeout(()=>{ state.reviewMode?goReview():goReview(); },260);
+  });
+  el.querySelector('#skip').onclick=goReview;
+  el.querySelector('#back').onclick=()=>{
+    if(state.reviewMode){ goReview(); return; }
+    state.idx=TOTAL-1; state.step='quiz'; render();
+  };
+}
+function goReview(){ state.reviewMode=false; state.step='review'; render(); }
+
+/* --- 未回答レビュー --- */
+function scrReview(){
+  const missing=[];
+  QUESTIONS.forEach((q,i)=>{ if(state.answers[q.code]==null) missing.push({type:'q',i,q}); });
+  if(state.vas==null) missing.push({type:'vas'});
+  el.className='card';
+  if(missing.length===0){
+    // 全問回答済み → 確認へ
+    state.step='confirm'; render(); return;
+  }
+  el.innerHTML = `
+    <span class="eyebrow" style="color:var(--amber);background:var(--amber-soft)">未回答の質問があります</span>
+    <h1>あと ${missing.length} 問の回答が必要です</h1>
+    <p class="lead">すべての質問が回答必須です。とばした質問に回答してください。</p>
+    <div id="revlist">
+      ${missing.map(m=>{
+        const label = m.type==='vas' ? '痛みの程度（VAS）' : `${m.q.group}：${esc(m.q.text)}`;
+        const key = m.type==='vas' ? 'vas' : String(m.i);
+        return `<div class="revitem">
+          <div><div class="tag">未回答</div><div class="q">${label}</div></div>
+          <button class="btn primary" data-key="${key}">回答する ▶</button>
+        </div>`;
+      }).join('')}
+    </div>`;
+  el.querySelectorAll('button[data-key]').forEach(b=> b.onclick=()=>{
+    const k=b.dataset.key;
+    state.reviewMode=true;
+    if(k==='vas'){ state.step='vas'; } else { state.idx=parseInt(k,10); state.step='quiz'; }
+    render();
+  });
+}
+
+/* --- 確認 --- */
+function scrConfirm(){
+  const s=calcScores();
+  el.className='card';
+  el.innerHTML = `
+    <span class="eyebrow">最終確認</span>
+    <h1>この内容で送信します</h1>
+    <div class="kv">
+      <div>患者番号：<b>${esc(state.patientId)}</b></div>
+      <div>評価時期：<b>${esc(state.timepoint)}</b></div>
+      <div>投与部位：<b>${esc(state.site)}</b></div>
+      <div>性別：<b>${esc(state.sex||'—')}</b></div>
+      <div>年齢：<b>${esc(state.age||'—')}</b></div>
+    </div>
+    <h2>KOOS スコア（100点満点・高いほど良好）</h2>
+    <div class="scoregrid">
+      ${[['痛み','Pain'],['症状','Sym'],['日常生活','ADL'],['スポーツ','Sp/Rec'],['QOL','QOL']]
+        .map(([j,k])=>`<div class="scorecell"><div class="lab">${j}</div><div class="val">${s[k]}</div><div class="unit">点</div></div>`).join('')}
+      <div class="scorecell"><div class="lab">痛みVAS</div><div class="val">${state.vas}</div><div class="unit">/ 10</div></div>
+    </div>
+    <div class="btnrow">
+      <button class="btn ghost" id="back">◀ もどって修正</button>
+      <div class="spacer"></div>
+      <button class="btn primary lg" id="send">この内容で送信する ✔</button>
+    </div>`;
+  el.querySelector('#back').onclick=()=>{ state.step='review'; state.reviewMode=false; state.idx=0; render(); };
+  el.querySelector('#send').onclick=submit;
+}
+
+/* --- 送信中 --- */
+function scrSending(){
+  el.className='card center';
+  el.innerHTML=`<div class="bigicon">⏳</div><h1>送信しています…</h1><p class="lead">画面を閉じずにお待ちください。</p>`;
+}
+
+/* --- 送信処理 --- */
+function buildPayload(){
+  const s=calcScores();
+  return {
+    appVersion:CONFIG.APP_VERSION,
+    answeredAt:new Date().toISOString(),
+    patientId:state.patientId, timepoint:state.timepoint, site:state.site,
+    age:state.age, sex:state.sex, consent:state.consent,
+    answers:state.answers, vas:state.vas, scores:s
+  };
+}
+async function submit(){
+  const payload=buildPayload();
+  state.step='sending'; render();
+  // GAS未設定時：ローカル保存にフォールバック
+  if(!CONFIG.GAS_URL){
+    saveLocal(payload);
+    state.step='done'; state.lastResult={local:true}; render(); return;
+  }
+  try{
+    const res=await fetch(CONFIG.GAS_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'}, // preflight回避
+      body:JSON.stringify(payload)
+    });
+    const txt=await res.text();
+    let json={}; try{ json=JSON.parse(txt); }catch(_){}
+    if(res.ok && json.ok){ state.lastResult=json; state.step='done'; render(); }
+    else { throw new Error(json.error||('サーバー応答: '+txt.slice(0,120))); }
+  }catch(err){
+    saveLocal(payload);            // 失敗時も端末に退避
+    state.lastError=err.message||String(err);
+    state.step='error'; render();
+  }
+}
+function saveLocal(payload){
+  try{
+    const key='koos_pending';
+    const arr=JSON.parse(localStorage.getItem(key)||'[]');
+    arr.push(payload); localStorage.setItem(key,JSON.stringify(arr));
+  }catch(_){}
+}
+
+/* --- 完了 --- */
+function scrDone(){
+  el.className='card center';
+  const local = state.lastResult && state.lastResult.local;
+  el.innerHTML=`
+    <div class="bigicon">✓</div>
+    <h1>ご回答ありがとうございました</h1>
+    <p class="lead">評価が完了しました。タブレットを受付・担当者にお返しください。</p>
+    ${local?'<p class="note">※現在オフライン設定のため、回答はこの端末に一時保存されました。</p>':''}
+    <div class="btnrow center" style="justify-content:center">
+      <button class="btn primary lg" id="again">次の方の入力を始める</button>
+    </div>`;
+  el.querySelector('#again').onclick=resetAll;
+}
+
+/* --- エラー --- */
+function scrError(){
+  el.className='card center';
+  el.innerHTML=`
+    <div class="bigicon err">!</div>
+    <h1>送信できませんでした</h1>
+    <p class="lead">通信環境をご確認のうえ、もう一度お試しください。<br>回答内容はこの端末に一時保存されています。</p>
+    <p class="note">${esc(state.lastError||'')}</p>
+    <div class="btnrow center" style="justify-content:center">
+      <button class="btn ghost" id="again">最初に戻る</button>
+      <button class="btn primary lg" id="retry">もう一度送信する</button>
+    </div>`;
+  el.querySelector('#retry').onclick=submit;
+  el.querySelector('#again').onclick=resetAll;
+}
+
+function resetAll(){
+  state.step='start'; state.patientId=''; state.timepoint=''; state.site=''; state.age=''; state.sex='';
+  state.consent=false; state.vas=null; state.idx=0; state.reviewMode=false; state.lastResult=null; state.lastError=null;
+  QUESTIONS.forEach(q=> state.answers[q.code]=null);
+  render();
+}
+
+render();
+</script>
+</body>
+</html>
