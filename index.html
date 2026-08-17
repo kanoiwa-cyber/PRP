@@ -57,6 +57,17 @@
   .qtext{font-size:32px;line-height:1.55;font-weight:800;color:var(--ink);margin:6px 0 28px;letter-spacing:.01em;}
   @media(max-width:520px){.qtext{font-size:27px;} h1{font-size:26px;} body{font-size:19px;}}
   .opts{display:flex;flex-direction:column;gap:14px;margin-top:auto;}
+  /* 両膝：右・左の回答グループ */
+  .sides{display:flex;flex-direction:column;gap:18px;margin-top:8px;}
+  .sidegroup{border:1.5px solid var(--line);border-radius:16px;padding:14px 14px 16px;background:#FCFDFD;}
+  .sidegroup.plain{border:none;background:none;padding:0;}
+  .bothhint{font-size:17px;font-weight:700;color:#7A4E12;background:var(--amber-soft);
+            border-radius:10px;padding:10px 14px;margin:2px 0 14px;}
+  .sidegroup .opts{margin-top:0;}
+  .sidelabel{display:inline-block;font-size:17px;font-weight:800;padding:5px 14px;border-radius:9px;margin-bottom:12px;}
+  .sidelabel.side-R{color:#0E4A43;background:var(--accent-soft);}
+  .sidelabel.side-L{color:#7A4E12;background:var(--amber-soft);}
+  .vsides .sidegroup{padding-bottom:10px;}
   .opt{display:flex;align-items:center;gap:16px;width:100%;text-align:left;cursor:pointer;
     background:#fff;border:2.5px solid var(--line);border-radius:16px;padding:20px 22px;font-size:23px;font-weight:600;
     color:var(--ink);transition:border-color .15s,background .15s,transform .05s;font-family:inherit;}
@@ -183,12 +194,17 @@ const state = {
   patientId: "",
   timepoint: "", site: "", age: "", sex: "",
   consent: false,
-  answers: {},   // code -> 1..5
-  vas: null,     // 0..10
+  answers: {},   // 右膝／片膝のとき: code -> 1..5
+  ansL: {},      // 両膝のときの左膝: code -> 1..5
+  vas: null,     // 右膝／片膝のVAS 0..10
+  vasL: null,    // 両膝のときの左膝VAS 0..10
   idx: 0,        // 質問インデックス 0..TOTAL(=VAS)
   reviewMode: false
 };
-QUESTIONS.forEach(q => state.answers[q.code] = null);
+QUESTIONS.forEach(q => { state.answers[q.code] = null; state.ansL[q.code] = null; });
+
+// 両膝かどうか。両膝のときは 右=answers/vas、左=ansL/vasL に格納
+function bothKnees(){ return state.site === '両膝'; }
 
 const el = document.getElementById('screen');
 const $ = (h) => { const d=document.createElement('div'); d.innerHTML=h; return d.firstElementChild; };
@@ -208,19 +224,26 @@ function updateProgress(){
 }
 
 /* ====== スコア計算（xlsxと同一ロジック：選択の重みを合計） ====== */
-function calcScores(){
+function calcScores(ans){
+  ans = ans || state.answers;
   const sums = {Pain:0,Sym:0,ADL:0,"Sp/Rec":0,QOL:0};
   QUESTIONS.forEach(q=>{
-    const sel = state.answers[q.code];
+    const sel = ans[q.code];
     if(sel){ sums[q.sec] += SECTIONS[q.sec].weights[sel-1]; }
   });
   const r = {};
   Object.keys(sums).forEach(k=> r[k]=Math.round(sums[k]*10)/10);
   return r;
 }
+// 指定インデックスの画面が「全部（両膝なら右も左も）」回答済みか
+function screenComplete(idx){
+  if(idx===VAS_INDEX) return state.vas!=null && (!bothKnees() || state.vasL!=null);
+  const c=QUESTIONS[idx].code;
+  return state.answers[c]!=null && (!bothKnees() || state.ansL[c]!=null);
+}
 function firstUnanswered(){
-  for(let i=0;i<TOTAL;i++){ if(state.answers[QUESTIONS[i].code]==null) return i; }
-  if(state.vas==null) return VAS_INDEX;
+  for(let i=0;i<TOTAL;i++){ if(!screenComplete(i)) return i; }
+  if(!screenComplete(VAS_INDEX)) return VAS_INDEX;
   return -1;
 }
 
@@ -337,27 +360,45 @@ function scrInfo(){
 function scrQuiz(){
   if(state.idx>=TOTAL){ state.step='vas'; render(); return; }
   const q=QUESTIONS[state.idx];
-  const sel=state.answers[q.code];
+  const both=bothKnees();
+
+  // 片側用のオプション群HTML（side: 'R'|'L'|''）
+  const optsHtml=(side)=>{
+    const cur = side==='L' ? state.ansL[q.code] : state.answers[q.code];
+    return q.opts.map((o,i)=>`
+      <button class="opt ${cur===i+1?'sel':''}" data-v="${i+1}">
+        <span class="num">${i+1}</span><span>${esc(o)}</span>
+      </button>`).join('');
+  };
+  const group=(side,label)=>`
+    <div class="sidegroup${side?'':' plain'}" data-side="${side}">
+      ${label?`<div class="sidelabel side-${side}">${label}</div>`:''}
+      <div class="opts">${optsHtml(side)}</div>
+    </div>`;
+
   el.className='card';
   el.innerHTML = `
     <div class="eyebrow">${esc(q.group)}</div>
     <div class="qtext">${esc(q.text)}</div>
-    <div class="opts">
-      ${q.opts.map((o,i)=>`
-        <button class="opt ${sel===i+1?'sel':''}" data-v="${i+1}">
-          <span class="num">${i+1}</span><span>${esc(o)}</span>
-        </button>`).join('')}
-    </div>
+    ${ both ? `<div class="bothhint">右ひざ・左ひざ それぞれで回答を選んでください</div>` : '' }
+    ${ both
+        ? `<div class="sides">${group('R','右ひざの回答')}${group('L','左ひざの回答')}</div>`
+        : group('', '') }
     <div class="btnrow">
       <button class="btn ghost" id="back">◀ もどる</button>
       <div class="spacer"></div>
-      <button class="btn skip" id="skip">この質問をとばす ▶</button>
+      <button class="btn skip" id="skip">${both?'この質問を両方とばす ▶':'この質問をとばす ▶'}</button>
     </div>`;
-  el.querySelectorAll('.opt').forEach(b=> b.onclick=()=>{
-    state.answers[q.code]=parseInt(b.dataset.v,10);
-    el.querySelectorAll('.opt').forEach(x=>x.classList.remove('sel'));
-    b.classList.add('sel');
-    setTimeout(advance,260);
+
+  el.querySelectorAll('.sidegroup').forEach(gp=>{
+    const side=gp.dataset.side;
+    gp.querySelectorAll('.opt').forEach(b=> b.onclick=()=>{
+      const v=parseInt(b.dataset.v,10);
+      if(side==='L') state.ansL[q.code]=v; else state.answers[q.code]=v;
+      gp.querySelectorAll('.opt').forEach(x=>x.classList.remove('sel'));
+      b.classList.add('sel');
+      if(screenComplete(state.idx)) setTimeout(advance,260);
+    });
   });
   el.querySelector('#skip').onclick=advance;
   el.querySelector('#back').onclick=()=>{
@@ -375,24 +416,37 @@ function advance(){
 /* --- VAS --- */
 function scrVas(){
   state.idx=VAS_INDEX;
+  const both=bothKnees();
+  const grid=(side)=>{
+    const cur = side==='L' ? state.vasL : state.vas;
+    return `<div class="sidegroup${side?'':' plain'}" data-side="${side}">
+      ${both?`<div class="sidelabel side-${side}">${side==='L'?'左ひざ':'右ひざ'}</div>`:''}
+      <div class="vasgrid">
+        ${Array.from({length:11},(_,n)=>`<button class="vasbtn ${cur===n?'sel':''}" data-v="${n}">${n}</button>`).join('')}
+      </div>
+    </div>`;
+  };
   el.className='card';
   el.innerHTML = `
     <div class="eyebrow">痛みの程度（VAS）</div>
     <div class="qtext">今の膝の痛みは、どのくらいですか？<br><span style="font-size:20px;font-weight:600;color:var(--muted)">0（痛みなし）〜 10（考えられる最もひどい痛み）で選んでください。</span></div>
-    <div class="vasgrid">
-      ${Array.from({length:11},(_,n)=>`<button class="vasbtn ${state.vas===n?'sel':''}" data-v="${n}">${n}</button>`).join('')}
-    </div>
+    ${ both ? `<div class="bothhint">右ひざ・左ひざ それぞれで選んでください</div>` : '' }
+    ${ both ? `<div class="sides vsides">${grid('R')}${grid('L')}</div>` : grid('') }
     <div class="vasends"><span>0：痛みなし</span><span>10：最もひどい痛み</span></div>
     <div class="btnrow">
       <button class="btn ghost" id="back">◀ もどる</button>
       <div class="spacer"></div>
-      <button class="btn skip" id="skip">とばす ▶</button>
+      <button class="btn skip" id="skip">${both?'両方とばす ▶':'とばす ▶'}</button>
     </div>`;
-  el.querySelectorAll('.vasbtn').forEach(b=> b.onclick=()=>{
-    state.vas=parseInt(b.dataset.v,10);
-    el.querySelectorAll('.vasbtn').forEach(x=>x.classList.remove('sel'));
-    b.classList.add('sel');
-    setTimeout(()=>{ state.reviewMode?goReview():goReview(); },260);
+  el.querySelectorAll('.sidegroup').forEach(gp=>{
+    const side=gp.dataset.side;
+    gp.querySelectorAll('.vasbtn').forEach(b=> b.onclick=()=>{
+      const v=parseInt(b.dataset.v,10);
+      if(side==='L') state.vasL=v; else state.vas=v;
+      gp.querySelectorAll('.vasbtn').forEach(x=>x.classList.remove('sel'));
+      b.classList.add('sel');
+      if(screenComplete(VAS_INDEX)) setTimeout(goReview,260);
+    });
   });
   el.querySelector('#skip').onclick=goReview;
   el.querySelector('#back').onclick=()=>{
@@ -404,21 +458,32 @@ function goReview(){ state.reviewMode=false; state.step='review'; render(); }
 
 /* --- 未回答レビュー --- */
 function scrReview(){
+  const both=bothKnees();
   const missing=[];
-  QUESTIONS.forEach((q,i)=>{ if(state.answers[q.code]==null) missing.push({type:'q',i,q}); });
-  if(state.vas==null) missing.push({type:'vas'});
-  el.className='card';
-  if(missing.length===0){
-    // 全問回答済み → 確認へ
-    state.step='confirm'; render(); return;
+  QUESTIONS.forEach((q,i)=>{
+    const needR = state.answers[q.code]==null;
+    const needL = both && state.ansL[q.code]==null;
+    if(needR||needL){
+      let sideTxt = both ? ('（' + [needR?'右':'',needL?'左':''].filter(Boolean).join('・') + '）') : '';
+      missing.push({type:'q',i,q,sideTxt});
+    }
+  });
+  const vasNeedR = state.vas==null;
+  const vasNeedL = both && state.vasL==null;
+  if(vasNeedR||vasNeedL){
+    let sideTxt = both ? ('（' + [vasNeedR?'右':'',vasNeedL?'左':''].filter(Boolean).join('・') + '）') : '';
+    missing.push({type:'vas',sideTxt});
   }
+  el.className='card';
+  if(missing.length===0){ state.step='confirm'; render(); return; }
   el.innerHTML = `
     <span class="eyebrow" style="color:var(--amber);background:var(--amber-soft)">未回答の質問があります</span>
     <h1>あと ${missing.length} 問の回答が必要です</h1>
-    <p class="lead">すべての質問が回答必須です。とばした質問に回答してください。</p>
+    <p class="lead">すべての質問が回答必須です。とばした質問に回答してください。${both?'<br>両膝のため、右・左それぞれの回答が必要です。':''}</p>
     <div id="revlist">
       ${missing.map(m=>{
-        const label = m.type==='vas' ? '痛みの程度（VAS）' : `${m.q.group}：${esc(m.q.text)}`;
+        const base = m.type==='vas' ? '痛みの程度（VAS）' : `${m.q.group}：${esc(m.q.text)}`;
+        const label = base + (m.sideTxt||'');
         const key = m.type==='vas' ? 'vas' : String(m.i);
         return `<div class="revitem">
           <div><div class="tag">未回答</div><div class="q">${label}</div></div>
@@ -436,7 +501,17 @@ function scrReview(){
 
 /* --- 確認 --- */
 function scrConfirm(){
-  const s=calcScores();
+  const both=bothKnees();
+  const scoreBlock=(ans,vasVal,title)=>{
+    const s=calcScores(ans);
+    return `
+    ${title?`<h2 class="sideh">${title}</h2>`:'<h2>KOOS スコア（100点満点・高いほど良好）</h2>'}
+    <div class="scoregrid">
+      ${[['痛み','Pain'],['症状','Sym'],['日常生活','ADL'],['スポーツ','Sp/Rec'],['QOL','QOL']]
+        .map(([j,k])=>`<div class="scorecell"><div class="lab">${j}</div><div class="val">${s[k]}</div><div class="unit">点</div></div>`).join('')}
+      <div class="scorecell"><div class="lab">痛みVAS</div><div class="val">${vasVal}</div><div class="unit">/ 10</div></div>
+    </div>`;
+  };
   el.className='card';
   el.innerHTML = `
     <span class="eyebrow">最終確認</span>
@@ -448,12 +523,9 @@ function scrConfirm(){
       <div>性別：<b>${esc(state.sex||'—')}</b></div>
       <div>年齢：<b>${esc(state.age||'—')}</b></div>
     </div>
-    <h2>KOOS スコア（100点満点・高いほど良好）</h2>
-    <div class="scoregrid">
-      ${[['痛み','Pain'],['症状','Sym'],['日常生活','ADL'],['スポーツ','Sp/Rec'],['QOL','QOL']]
-        .map(([j,k])=>`<div class="scorecell"><div class="lab">${j}</div><div class="val">${s[k]}</div><div class="unit">点</div></div>`).join('')}
-      <div class="scorecell"><div class="lab">痛みVAS</div><div class="val">${state.vas}</div><div class="unit">/ 10</div></div>
-    </div>
+    ${ both
+        ? scoreBlock(state.answers, state.vas, '右ひざの KOOS スコア') + scoreBlock(state.ansL, state.vasL, '左ひざの KOOS スコア')
+        : scoreBlock(state.answers, state.vas, '') }
     <div class="btnrow">
       <button class="btn ghost" id="back">◀ もどって修正</button>
       <div class="spacer"></div>
@@ -470,36 +542,47 @@ function scrSending(){
 }
 
 /* --- 送信処理 --- */
-function buildPayload(){
-  const s=calcScores();
-  return {
+// 送信するレコード（両膝なら右・左の2件、片膝なら1件）を組み立て
+function buildRecords(){
+  const base={
     appVersion:CONFIG.APP_VERSION,
     answeredAt:new Date().toISOString(),
-    patientId:state.patientId, timepoint:state.timepoint, site:state.site,
-    age:state.age, sex:state.sex, consent:state.consent,
-    answers:state.answers, vas:state.vas, scores:s
+    patientId:state.patientId, timepoint:state.timepoint,
+    age:state.age, sex:state.sex, consent:state.consent
   };
+  if(bothKnees()){
+    return [
+      Object.assign({}, base, { site:'右膝', answers:state.answers, vas:state.vas, scores:calcScores(state.answers) }),
+      Object.assign({}, base, { site:'左膝', answers:state.ansL,    vas:state.vasL, scores:calcScores(state.ansL) })
+    ];
+  }
+  return [ Object.assign({}, base, { site:state.site, answers:state.answers, vas:state.vas, scores:calcScores(state.answers) }) ];
+}
+async function postOne(payload){
+  const res=await fetch(CONFIG.GAS_URL,{
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'}, // preflight回避
+    body:JSON.stringify(payload)
+  });
+  const txt=await res.text();
+  let json={}; try{ json=JSON.parse(txt); }catch(_){}
+  if(res.ok && json.ok){ return json; }
+  throw new Error(json.error||('サーバー応答: '+txt.slice(0,120)));
 }
 async function submit(){
-  const payload=buildPayload();
+  const records=buildRecords();
   state.step='sending'; render();
   // GAS未設定時：ローカル保存にフォールバック
   if(!CONFIG.GAS_URL){
-    saveLocal(payload);
+    records.forEach(saveLocal);
     state.step='done'; state.lastResult={local:true}; render(); return;
   }
   try{
-    const res=await fetch(CONFIG.GAS_URL,{
-      method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'}, // preflight回避
-      body:JSON.stringify(payload)
-    });
-    const txt=await res.text();
-    let json={}; try{ json=JSON.parse(txt); }catch(_){}
-    if(res.ok && json.ok){ state.lastResult=json; state.step='done'; render(); }
-    else { throw new Error(json.error||('サーバー応答: '+txt.slice(0,120))); }
+    let last=null;
+    for(const rec of records){ last=await postOne(rec); }  // 両膝は右→左の順に送信
+    state.lastResult=last; state.step='done'; render();
   }catch(err){
-    saveLocal(payload);            // 失敗時も端末に退避
+    records.forEach(saveLocal);    // 失敗時も端末に退避（右・左とも）
     state.lastError=err.message||String(err);
     state.step='error'; render();
   }
@@ -545,8 +628,8 @@ function scrError(){
 
 function resetAll(){
   state.step='start'; state.patientId=''; state.timepoint=''; state.site=''; state.age=''; state.sex='';
-  state.consent=false; state.vas=null; state.idx=0; state.reviewMode=false; state.lastResult=null; state.lastError=null;
-  QUESTIONS.forEach(q=> state.answers[q.code]=null);
+  state.consent=false; state.vas=null; state.vasL=null; state.idx=0; state.reviewMode=false; state.lastResult=null; state.lastError=null;
+  QUESTIONS.forEach(q=>{ state.answers[q.code]=null; state.ansL[q.code]=null; });
   render();
 }
 
