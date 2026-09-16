@@ -63,6 +63,19 @@
   .sidegroup.plain{border:none;background:none;padding:0;}
   .bothhint{font-size:17px;font-weight:700;color:#7A4E12;background:var(--amber-soft);
             border-radius:10px;padding:10px 14px;margin:2px 0 14px;}
+  /* スタッフ照会 */
+  .searchrow{display:flex;gap:10px;margin:8px 0 4px;}
+  .searchrow input{flex:1;font-size:20px;padding:14px 16px;border:2px solid var(--line);border-radius:12px;background:#fff;}
+  .searchrow input:focus{outline:none;border-color:var(--primary);}
+  .fieldlabel{display:block;font-weight:700;color:var(--primary-d);margin:6px 0 6px;}
+  .matrixwrap{overflow-x:auto;margin:10px 0 4px;}
+  .matrix{border-collapse:collapse;width:100%;font-size:16px;min-width:420px;}
+  .matrix th,.matrix td{border:1px solid var(--line);padding:8px 10px;text-align:center;}
+  .matrix tr:first-child th{background:var(--primary);color:#fff;font-weight:700;}
+  .matrix th.rk{background:var(--bg);color:var(--primary-d);text-align:left;font-weight:700;white-space:nowrap;}
+  .matrix td{font-variant-numeric:tabular-nums;}
+  .btn.danger{background:#fff;color:var(--danger);border:1.5px solid #E3B9B9;padding:10px 16px;font-size:16px;}
+  .btn.danger:hover{background:#FBEDED;}
   .sidegroup .opts{margin-top:0;}
   .sidelabel{display:inline-block;font-size:17px;font-weight:800;padding:5px 14px;border-radius:9px;margin-bottom:12px;}
   .sidelabel.side-R{color:#0E4A43;background:var(--accent-soft);}
@@ -160,6 +173,7 @@
     </div>
     <div class="spacer"></div>
     <div class="appbar-actions">
+      <button type="button" class="tbtn" id="btnStaff"><span class="ic">🔒</span>スタッフ</button>
       <button type="button" class="tbtn" id="btnReload"><span class="ic">↻</span>更新</button>
       <button type="button" class="tbtn solid" id="btnNew"><span class="ic">＋</span>新規患者</button>
     </div>
@@ -180,7 +194,8 @@
 const CONFIG = {
   GAS_URL: "https://script.google.com/macros/s/AKfycbyeRg1d1Fu66pJZ0W7nhSG2bSRsZB7AIigPS-SMajWkhf2AKqnbwvUGZSBmgjZZMhx3/exec",  // GASデプロイ済みURL
   PRIVACY_URL: "https://kanoiwa-hospital.or.jp/%e7%97%85%e9%99%a2%e3%81%ab%e3%81%a4%e3%81%84%e3%81%a6/%e5%80%8b%e4%ba%ba%e6%83%85%e5%a0%b1%e4%bf%9d%e8%ad%b7%e6%96%b9%e9%87%9d",
-  APP_VERSION: "KOOS-Web v1.0"
+  APP_VERSION: "KOOS-Web v1.0",
+  STAFF_KEY: "2511"   // スタッフ照会画面のパスキー
 };
 
 const SECTIONS = {"Sym": {"jp": "症状", "weights": [14.3, 10.7, 7.1, 3.6, 0.0]}, "Pain": {"jp": "痛み", "weights": [11.1, 8.3, 5.6, 2.8, 0.0]}, "ADL": {"jp": "日常生活", "weights": [5.9, 4.4, 2.9, 1.5, 0.0]}, "Sp/Rec": {"jp": "スポーツ・レクリエーション", "weights": [20, 15, 10, 5, 0]}, "QOL": {"jp": "生活の質（QOL）", "weights": [25, 18.8, 12.5, 6.3, 0.0]}};
@@ -199,7 +214,9 @@ const state = {
   vas: null,     // 右膝／片膝のVAS 0..10
   vasL: null,    // 両膝のときの左膝VAS 0..10
   idx: 0,        // 質問インデックス 0..TOTAL(=VAS)
-  reviewMode: false
+  reviewMode: false,
+  // スタッフ照会
+  staffAuthed:false, staffPid:'', staffRecords:null, staffLoading:false, staffMsg:''
 };
 QUESTIONS.forEach(q => { state.answers[q.code] = null; state.ansL[q.code] = null; });
 
@@ -252,7 +269,7 @@ function render(){
   updateProgress();
   const map = {start:scrStart, consent:scrConsent, info:scrInfo, quiz:scrQuiz,
                vas:scrVas, review:scrReview, confirm:scrConfirm, sending:scrSending,
-               done:scrDone, error:scrError};
+               done:scrDone, error:scrError, stafflogin:scrStaffLogin, staff:scrStaff};
   (map[state.step]||scrStart)();
   window.scrollTo(0,0);
 }
@@ -500,18 +517,20 @@ function scrReview(){
 }
 
 /* --- 確認 --- */
-function scrConfirm(){
-  const both=bothKnees();
-  const scoreBlock=(ans,vasVal,title)=>{
-    const s=calcScores(ans);
-    return `
+/* スコア表示グリッド（scores:{Pain..QOL} と VAS 値から） */
+function scoreGridHtml(s, vasVal, title){
+  const v = (vasVal===0||vasVal) ? vasVal : '—';
+  return `
     ${title?`<h2 class="sideh">${title}</h2>`:'<h2>KOOS スコア（100点満点・高いほど良好）</h2>'}
     <div class="scoregrid">
       ${[['痛み','Pain'],['症状','Sym'],['日常生活','ADL'],['スポーツ','Sp/Rec'],['QOL','QOL']]
-        .map(([j,k])=>`<div class="scorecell"><div class="lab">${j}</div><div class="val">${s[k]}</div><div class="unit">点</div></div>`).join('')}
-      <div class="scorecell"><div class="lab">痛みVAS</div><div class="val">${vasVal}</div><div class="unit">/ 10</div></div>
+        .map(([j,k])=>`<div class="scorecell"><div class="lab">${j}</div><div class="val">${(s&&(s[k]===0||s[k]))?s[k]:'—'}</div><div class="unit">点</div></div>`).join('')}
+      <div class="scorecell"><div class="lab">痛みVAS</div><div class="val">${v}</div><div class="unit">/ 10</div></div>
     </div>`;
-  };
+}
+function scrConfirm(){
+  const both=bothKnees();
+  const scoreBlock=(ans,vasVal,title)=> scoreGridHtml(calcScores(ans), vasVal, title);
   el.className='card';
   el.innerHTML = `
     <span class="eyebrow">最終確認</span>
@@ -597,14 +616,27 @@ function saveLocal(payload){
 
 /* --- 完了 --- */
 function scrDone(){
-  el.className='card center';
+  el.className='card';
   const local = state.lastResult && state.lastResult.local;
+  const both=bothKnees();
+  const scores = both
+    ? scoreGridHtml(calcScores(state.answers), state.vas, '右ひざの KOOS スコア') +
+      scoreGridHtml(calcScores(state.ansL),    state.vasL, '左ひざの KOOS スコア')
+    : scoreGridHtml(calcScores(state.answers), state.vas, '');
   el.innerHTML=`
-    <div class="bigicon">✓</div>
-    <h1>ご回答ありがとうございました</h1>
-    <p class="lead">評価が完了しました。タブレットを受付・担当者にお返しください。</p>
-    ${local?'<p class="note">※現在オフライン設定のため、回答はこの端末に一時保存されました。</p>':''}
-    <div class="btnrow center" style="justify-content:center">
+    <div class="donehead">
+      <div class="bigicon" style="margin:0 auto 6px">✓</div>
+      <h1 style="text-align:center">回答お疲れさまでした</h1>
+      <p class="lead" style="text-align:center">この画面をスタッフにお見せください。</p>
+      ${local?'<p class="note" style="text-align:center">※現在オフライン設定のため、回答はこの端末に一時保存されました。</p>':''}
+    </div>
+    <div class="kv">
+      <div>患者番号：<b>${esc(state.patientId)}</b></div>
+      <div>評価時期：<b>${esc(state.timepoint)}</b></div>
+      <div>投与部位：<b>${esc(state.site)}</b></div>
+    </div>
+    ${scores}
+    <div class="btnrow center" style="justify-content:center;margin-top:8px">
       <button class="btn primary lg" id="again">次の方の入力を始める</button>
     </div>`;
   el.querySelector('#again').onclick=resetAll;
@@ -635,7 +667,7 @@ function resetAll(){
 
 /* --- ヘッダーのボタン（どの画面でも使用可） --- */
 function inProgress(){
-  return state.step!=='start' && state.step!=='done';
+  return ['consent','info','quiz','vas','review','confirm'].indexOf(state.step) >= 0;
 }
 function reloadPage(){
   if(inProgress() && !confirm('ページを更新すると入力中の内容は消えます。更新してもよろしいですか？')) return;
@@ -648,6 +680,128 @@ function newPatient(){
 }
 document.getElementById('btnReload').addEventListener('click', reloadPage);
 document.getElementById('btnNew').addEventListener('click', newPatient);
+document.getElementById('btnStaff').addEventListener('click', ()=>{
+  if(inProgress() && !confirm('問診を中断してスタッフ画面を開きます。入力中の内容は保存されません。よろしいですか？')) return;
+  state.staffMsg='';
+  state.step = state.staffAuthed ? 'staff' : 'stafflogin';
+  render();
+});
+
+/* ====== スタッフ用：ログイン ====== */
+function scrStaffLogin(){
+  el.className='card';
+  el.innerHTML=`
+    <div class="btnrow" style="margin-bottom:6px">
+      <button class="btn ghost" id="toquiz">◀ 問診へ戻る</button>
+    </div>
+    <span class="eyebrow">スタッフ専用</span>
+    <h1>スタッフ専用画面</h1>
+    <p class="lead">この画面はスタッフ専用です。パスキーを入力してください。</p>
+    <label class="fieldlabel">パスキー</label>
+    <input id="pkey" type="password" inputmode="numeric" placeholder="パスキー" autocomplete="off">
+    ${state.staffMsg?`<p class="note" style="color:var(--danger)">${esc(state.staffMsg)}</p>`:''}
+    <div class="btnrow"><div class="spacer"></div><button class="btn primary lg" id="login">ログイン ▶</button></div>`;
+  const tryLogin=()=>{
+    const v=(el.querySelector('#pkey').value||'').trim();
+    if(v===String(CONFIG.STAFF_KEY)){ state.staffAuthed=true; state.staffMsg=''; state.step='staff'; render(); }
+    else { state.staffMsg='パスキーが違います。'; render(); }
+  };
+  el.querySelector('#login').onclick=tryLogin;
+  el.querySelector('#pkey').addEventListener('keydown',e=>{ if(e.key==='Enter') tryLogin(); });
+  el.querySelector('#toquiz').onclick=()=>{ state.staffMsg=''; state.step='start'; render(); };
+}
+
+/* ====== スタッフ用：スコア照会 ====== */
+function fmtDate(s){
+  if(!s) return ''; const d=new Date(s); if(isNaN(d.getTime())) return esc(String(s));
+  const p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function staffResultsHtml(){
+  const recs=state.staffRecords||[];
+  if(recs.length===0) return '';
+  const TP=['術前','1ヶ月','3ヶ月','6ヶ月'];
+  const ROWS=[['痛み','Pain'],['症状','Sym'],['日常生活','ADL'],['スポーツ','Sp/Rec'],['QOL','QOL'],['痛みVAS','VAS']];
+  const sites=[]; recs.forEach(r=>{ if(sites.indexOf(r.site)<0) sites.push(r.site); });
+  // (部位×時期) は最新の送信を採用
+  const pick={};
+  recs.slice().sort((a,b)=> new Date(a.receivedAt)-new Date(b.receivedAt)).forEach(r=>{ pick[r.site+'||'+r.timepoint]=r; });
+  const matrices=sites.map(site=>{
+    const head=`<tr><th>${esc(site||'—')}</th>${TP.map(t=>`<th>${t}</th>`).join('')}</tr>`;
+    const body=ROWS.map(([lab,key])=>{
+      const cells=TP.map(t=>{
+        const r=pick[site+'||'+t]; let v='—';
+        if(r){ v = key==='VAS' ? ((r.vas===0||r.vas)?r.vas:'—') : ((r.scores&&(r.scores[key]===0||r.scores[key]))?r.scores[key]:'—'); }
+        return `<td>${v}</td>`;
+      }).join('');
+      return `<tr><th class="rk">${lab}</th>${cells}</tr>`;
+    }).join('');
+    return `<div class="matrixwrap"><table class="matrix">${head}${body}</table></div>`;
+  }).join('');
+  const list=recs.slice().sort((a,b)=> new Date(b.receivedAt)-new Date(a.receivedAt)).map(r=>`
+    <div class="revitem">
+      <div><div class="tag">${esc(r.timepoint||'—')}・${esc(r.site||'—')}</div>
+        <div class="q">${fmtDate(r.receivedAt)}${r.name?(' ／ '+esc(r.name)):''}</div></div>
+      <button class="btn danger" data-row="${r.row}">削除</button>
+    </div>`).join('');
+  return `<h2>スコア一覧（患者番号：${esc(state.staffPid)}）</h2>${matrices}
+    <h2 style="margin-top:16px">送信履歴（不要な記録は削除できます）</h2>
+    <div id="dellist">${list}</div>`;
+}
+function scrStaff(){
+  el.className='card';
+  el.innerHTML=`
+    <div class="btnrow" style="margin-bottom:6px">
+      <button class="btn ghost" id="toquiz">◀ 問診へ戻る</button>
+      <div class="spacer"></div>
+      <button class="btn ghost" id="logout">ログアウト</button>
+    </div>
+    <span class="eyebrow">スタッフ専用</span>
+    <h1>スコア照会・過去の記録</h1>
+    <p class="lead">患者番号で過去の回答スコアを検索できます（術前・1ヶ月・3ヶ月・6ヶ月）。</p>
+    <div class="searchrow">
+      <input id="spid" inputmode="numeric" placeholder="患者番号を入力" value="${esc(state.staffPid||'')}">
+      <button class="btn primary" id="dosearch">検索</button>
+    </div>
+    ${state.staffMsg?`<p class="note" style="color:var(--amber)">${esc(state.staffMsg)}</p>`:''}
+    <div id="results">${state.staffLoading?'<p class="lead">検索しています…</p>':(state.staffRecords?staffResultsHtml():'')}</div>`;
+  el.querySelector('#toquiz').onclick=()=>{ state.step='start'; render(); };
+  el.querySelector('#logout').onclick=()=>{ state.staffAuthed=false; state.staffRecords=null; state.staffPid=''; state.staffMsg=''; state.step='start'; render(); };
+  const doSearch=()=>{ state.staffPid=(el.querySelector('#spid').value||''); staffSearch(); };
+  el.querySelector('#dosearch').onclick=doSearch;
+  el.querySelector('#spid').addEventListener('keydown',e=>{ if(e.key==='Enter') doSearch(); });
+  el.querySelectorAll('button[data-row]').forEach(b=> b.onclick=()=>{
+    const rec=(state.staffRecords||[]).find(x=>String(x.row)===b.dataset.row);
+    if(rec) staffDelete(rec);
+  });
+}
+async function staffSearch(){
+  const pid=(state.staffPid||'').trim();
+  if(!pid){ state.staffMsg='患者番号を入力してください。'; state.staffRecords=null; render(); return; }
+  if(!CONFIG.GAS_URL){ state.staffMsg='送信先(GAS)が未設定のため照会できません。'; state.staffRecords=null; render(); return; }
+  state.staffLoading=true; state.staffMsg=''; state.staffRecords=null; render();
+  try{
+    const url=CONFIG.GAS_URL+'?action=search&pid='+encodeURIComponent(pid)+'&key='+encodeURIComponent(CONFIG.STAFF_KEY);
+    const res=await fetch(url);
+    const json=await res.json();
+    if(!json.ok) throw new Error(json.error||'検索に失敗しました');
+    state.staffRecords=json.records||[];
+    if(state.staffRecords.length===0) state.staffMsg='該当する記録がありません。';
+  }catch(err){ state.staffMsg='検索エラー: '+(err.message||err); state.staffRecords=null; }
+  state.staffLoading=false; render();
+}
+async function staffDelete(rec){
+  if(!confirm('この記録を削除します。よろしいですか？\n（'+ (rec.timepoint||'—') +'・'+ (rec.site||'—') +'）\n報告書の該当欄も消去されます。')) return;
+  state.staffLoading=true; render();
+  try{
+    const res=await fetch(CONFIG.GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'delete', key:CONFIG.STAFF_KEY, row:rec.row,
+        patientId:(state.staffPid||'').trim(), site:rec.site, timepoint:rec.timepoint})});
+    const json=await res.json();
+    if(!json.ok) throw new Error(json.error||'削除に失敗しました');
+  }catch(err){ state.staffLoading=false; state.staffMsg='削除エラー: '+(err.message||err); render(); return; }
+  await staffSearch();
+}
 
 render();
 </script>
