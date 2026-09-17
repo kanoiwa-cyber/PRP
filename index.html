@@ -76,6 +76,10 @@
   .matrix td{font-variant-numeric:tabular-nums;}
   .btn.danger{background:#fff;color:var(--danger);border:1.5px solid #E3B9B9;padding:10px 16px;font-size:16px;}
   .btn.danger:hover{background:#FBEDED;}
+  .resume{border:2px solid var(--accent);background:var(--accent-soft);border-radius:14px;padding:14px 16px;margin-bottom:18px;}
+  .resume-t{font-weight:800;color:var(--primary-d);font-size:18px;margin-bottom:4px;}
+  .resume-s{color:var(--muted);font-size:15px;margin-bottom:10px;line-height:1.6;}
+  .resume .btnrow{margin-top:2px;}
   .sidegroup .opts{margin-top:0;}
   .sidelabel{display:inline-block;font-size:17px;font-weight:800;padding:5px 14px;border-radius:9px;margin-bottom:12px;}
   .sidelabel.side-R{color:#0E4A43;background:var(--accent-soft);}
@@ -271,13 +275,26 @@ function render(){
                vas:scrVas, review:scrReview, confirm:scrConfirm, sending:scrSending,
                done:scrDone, error:scrError, stafflogin:scrStaffLogin, staff:scrStaff};
   (map[state.step]||scrStart)();
+  if(ANSWER_STEPS.indexOf(state.step)>=0) saveDraft();
   window.scrollTo(0,0);
 }
 
 /* --- スタート（患者番号） --- */
 function scrStart(){
+  const draft=loadDraft();
+  const canResume = draft && draft.patientId;
+  const resume = canResume ? `
+    <div class="resume">
+      <div class="resume-t">入力途中のデータがあります</div>
+      <div class="resume-s">患者番号：<b>${esc(draft.patientId)}</b>${draft.timepoint?('　／　'+esc(draft.timepoint)):''}${draft.site?('　／　'+esc(draft.site)):''}<br>最終保存：${fmtDate(draft.savedAt)}</div>
+      <div class="btnrow">
+        <button class="btn ghost" id="dropDraft">破棄する</button>
+        <div class="spacer"></div>
+        <button class="btn primary" id="resumeDraft">続きから再開する ▶</button>
+      </div>
+    </div>` : '';
   el.className='card';
-  el.innerHTML = `
+  el.innerHTML = resume + `
     <span class="eyebrow">ステップ 1／3</span>
     <h1>患者番号を入力してください</h1>
     <p class="lead">この評価では、お名前などの個人情報は入力しません。<br>受付でお渡しした<b>患者番号</b>のみを入力してください。</p>
@@ -289,6 +306,10 @@ function scrStart(){
       <div class="spacer"></div>
       <button class="btn primary lg" id="next">次へすすむ ▶</button>
     </div>`;
+  if(canResume){
+    el.querySelector('#resumeDraft').onclick=()=>applyDraft(draft);
+    el.querySelector('#dropDraft').onclick=()=>{ if(confirm('入力途中のデータを破棄します。よろしいですか？')){ clearDraft(); render(); } };
+  }
   const inp = el.querySelector('#pid');
   const go = ()=>{ const v=inp.value.trim(); if(!v){ inp.focus(); inp.style.borderColor='var(--danger)'; return;} state.patientId=v; state.step='consent'; render(); };
   el.querySelector('#next').onclick=go;
@@ -614,8 +635,39 @@ function saveLocal(payload){
   }catch(_){}
 }
 
+/* --- 入力途中の自動保存（下書き） --- */
+const DRAFT_KEY='koos_draft';
+const ANSWER_STEPS=['consent','info','quiz','vas','review','confirm'];
+function saveDraft(){
+  try{
+    const d={ v:1, savedAt:Date.now(), step:state.step, idx:state.idx,
+      patientId:state.patientId, timepoint:state.timepoint, site:state.site,
+      age:state.age, sex:state.sex, consent:state.consent,
+      vas:state.vas, vasL:state.vasL, answers:state.answers, ansL:state.ansL };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+  }catch(_){}
+}
+function loadDraft(){
+  try{ const s=localStorage.getItem(DRAFT_KEY); return s?JSON.parse(s):null; }catch(_){ return null; }
+}
+function clearDraft(){ try{ localStorage.removeItem(DRAFT_KEY); }catch(_){} }
+function applyDraft(d){
+  state.patientId=d.patientId||''; state.timepoint=d.timepoint||''; state.site=d.site||'';
+  state.age=d.age||''; state.sex=d.sex||''; state.consent=!!d.consent;
+  state.vas=(d.vas===0||d.vas)?d.vas:null; state.vasL=(d.vasL===0||d.vasL)?d.vasL:null;
+  QUESTIONS.forEach(q=>{
+    state.answers[q.code]=(d.answers&&(d.answers[q.code]===0||d.answers[q.code]))?d.answers[q.code]:null;
+    state.ansL[q.code]=(d.ansL&&(d.ansL[q.code]===0||d.ansL[q.code]))?d.ansL[q.code]:null;
+  });
+  state.idx=(typeof d.idx==='number')?d.idx:0;
+  state.reviewMode=false;
+  state.step=d.step||'quiz';
+  render();
+}
+
 /* --- 完了 --- */
 function scrDone(){
+  clearDraft();   // 送信完了したので下書きは不要
   el.className='card';
   const local = state.lastResult && state.lastResult.local;
   const both=bothKnees();
@@ -659,6 +711,7 @@ function scrError(){
 }
 
 function resetAll(){
+  clearDraft();   // 意図的に最初からやり直すので下書きは破棄
   state.step='start'; state.patientId=''; state.timepoint=''; state.site=''; state.age=''; state.sex='';
   state.consent=false; state.vas=null; state.vasL=null; state.idx=0; state.reviewMode=false; state.lastResult=null; state.lastError=null;
   QUESTIONS.forEach(q=>{ state.answers[q.code]=null; state.ansL[q.code]=null; });
@@ -670,7 +723,7 @@ function inProgress(){
   return ['consent','info','quiz','vas','review','confirm'].indexOf(state.step) >= 0;
 }
 function reloadPage(){
-  if(inProgress() && !confirm('ページを更新すると入力中の内容は消えます。更新してもよろしいですか？')) return;
+  if(inProgress() && !confirm('ページを更新します。入力途中は自動保存され、次回「続きから再開」できます。更新しますか？')) return;
   location.reload();
 }
 function newPatient(){
@@ -681,7 +734,7 @@ function newPatient(){
 document.getElementById('btnReload').addEventListener('click', reloadPage);
 document.getElementById('btnNew').addEventListener('click', newPatient);
 document.getElementById('btnStaff').addEventListener('click', ()=>{
-  if(inProgress() && !confirm('問診を中断してスタッフ画面を開きます。入力中の内容は保存されません。よろしいですか？')) return;
+  if(inProgress() && !confirm('問診を中断してスタッフ画面を開きます。入力途中は自動保存されます。よろしいですか？')) return;
   state.staffMsg='';
   state.step = state.staffAuthed ? 'staff' : 'stafflogin';
   render();
@@ -764,7 +817,8 @@ function scrStaff(){
       <button class="btn primary" id="dosearch">検索</button>
     </div>
     ${state.staffMsg?`<p class="note" style="color:var(--amber)">${esc(state.staffMsg)}</p>`:''}
-    <div id="results">${state.staffLoading?'<p class="lead">検索しています…</p>':(state.staffRecords?staffResultsHtml():'')}</div>`;
+    <div id="results">${state.staffLoading?'<p class="lead">検索しています…</p>':(state.staffRecords?staffResultsHtml():'')}</div>
+    <div id="devdata">${deviceDataHtml()}</div>`;
   el.querySelector('#toquiz').onclick=()=>{ state.step='start'; render(); };
   el.querySelector('#logout').onclick=()=>{ state.staffAuthed=false; state.staffRecords=null; state.staffPid=''; state.staffMsg=''; state.step='start'; render(); };
   const doSearch=()=>{ state.staffPid=(el.querySelector('#spid').value||''); staffSearch(); };
@@ -774,6 +828,47 @@ function scrStaff(){
     const rec=(state.staffRecords||[]).find(x=>String(x.row)===b.dataset.row);
     if(rec) staffDelete(rec);
   });
+  const od=el.querySelector('#openDraft'); if(od) od.onclick=()=>{ const dr=loadDraft(); if(dr) applyDraft(dr); };
+  el.querySelectorAll('button[data-resend]').forEach(b=> b.onclick=()=> resendPending(parseInt(b.dataset.resend,10)));
+  el.querySelectorAll('button[data-droppend]').forEach(b=> b.onclick=()=> dropPending(parseInt(b.dataset.droppend,10)));
+}
+/* この端末に残っている未送信データ／下書きの表示・操作 */
+function getPending(){ try{ return JSON.parse(localStorage.getItem('koos_pending')||'[]'); }catch(_){ return []; } }
+function setPending(arr){ try{ localStorage.setItem('koos_pending', JSON.stringify(arr)); }catch(_){} }
+function deviceDataHtml(){
+  const pend=getPending(); const draft=loadDraft();
+  let html='<h2 style="margin-top:18px">この端末に残っているデータ</h2>';
+  if(!pend.length && !(draft&&draft.patientId)){
+    return html+'<p class="lead">未送信データや入力途中の下書きはありません。</p>';
+  }
+  if(draft&&draft.patientId){
+    html+=`<div class="revitem"><div><div class="tag">入力途中（下書き）</div>
+      <div class="q">患者番号 ${esc(draft.patientId)} ／ ${esc(draft.timepoint||'—')} ／ ${esc(draft.site||'—')}　最終保存 ${fmtDate(draft.savedAt)}</div></div>
+      <button class="btn primary" id="openDraft">続きを開く</button></div>`;
+  }
+  pend.forEach((p,i)=>{
+    html+=`<div class="revitem"><div><div class="tag" style="background:var(--amber-soft);color:#7A4E12">未送信</div>
+      <div class="q">患者番号 ${esc(p.patientId||'—')} ／ ${esc(p.timepoint||'—')} ／ ${esc(p.site||'—')}${p.answeredAt?'　'+fmtDate(p.answeredAt):''}</div></div>
+      <div style="display:flex;gap:8px"><button class="btn primary" data-resend="${i}">再送信</button>
+      <button class="btn danger" data-droppend="${i}">破棄</button></div></div>`;
+  });
+  return html;
+}
+async function resendPending(i){
+  const arr=getPending(); const p=arr[i]; if(!p) return;
+  if(!CONFIG.GAS_URL){ state.staffMsg='送信先(GAS)が未設定のため再送信できません。'; render(); return; }
+  state.staffMsg='再送信しています…'; render();
+  try{
+    await postOne(p);
+    const arr2=getPending(); arr2.splice(i,1); setPending(arr2);
+    state.staffMsg='再送信しました（患者番号 '+(p.patientId||'')+'／'+(p.timepoint||'')+'）。';
+  }catch(err){ state.staffMsg='再送信に失敗: '+(err.message||err); }
+  render();
+}
+function dropPending(i){
+  if(!confirm('この未送信データを破棄します。よろしいですか？')) return;
+  const arr=getPending(); arr.splice(i,1); setPending(arr);
+  render();
 }
 async function staffSearch(){
   const pid=(state.staffPid||'').trim();
